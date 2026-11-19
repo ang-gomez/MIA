@@ -45,7 +45,7 @@ def list_image_files(folder):
     config.IMAGE_EXTENSIONS), sorted by name.
     Subfolders are searched only if config.SEARCH_SUBFOLDERS is True.
     The "figures" and "results" folders made by this program are ignored.
-    """ 
+    """
     # glob("*")  = only this folder ; rglob("*") = this folder + all subfolders
     if config.SEARCH_SUBFOLDERS:
         candidates = folder.rglob("*")
@@ -661,6 +661,53 @@ def figure_ranking(ranking, title, n_shown=20):
     ax.set_xlim(0, 1)
     ax.tick_params(axis="y", labelsize=7)
     ax.set_title(title)
+    return fig
+
+
+def figure_all_recipes(ranking, best_name, title):
+    """
+    Mean score of ALL the recipes, sorted from best to worst.
+    Shows that most recipes are NOT good: only the top ones are close to 1.
+    """
+    scores = [score for _, score in ranking]
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.plot(range(1, len(scores) + 1), scores, marker="o", markersize=3, color="steelblue")
+    ax.plot(1, scores[0], marker="o", markersize=8, color=config.ALGORITHM_COLOR,
+            label=f"best: {best_name}")
+    ax.set_xlabel("recipe rank (1 = best)")
+    ax.set_ylabel(f"mean {config.RANKING_METRIC} (development)")
+    ax.set_ylim(0, 1.02)
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=8, loc="lower left")
+    ax.set_title(title)
+    return fig
+
+
+def figure_parameter_effects(results, group, metric):
+    """
+    One box plot per parameter (channel, smoothing, threshold, opening radius).
+    Each box = all the scores obtained WITH that option, on the images of `group`.
+    Shows which choices make the segmentation good or bad.
+    """
+    # recipe names look like "green_inverted | sigma=0 | multi_otsu | r=2"
+    parameter_names = ["channel", "smoothing", "threshold", "opening radius"]
+    fig, axes = plt.subplots(1, 4, figsize=(16, 4.5))
+
+    for i, (ax, parameter) in enumerate(zip(axes, parameter_names)):
+        values_per_option = {}
+        for row in results:
+            if row["group"] == group:
+                option = row["recipe"].split(" | ")[i]
+                values_per_option.setdefault(option, []).append(row[metric])
+        options = list(values_per_option.keys())
+        ax.boxplot([values_per_option[o] for o in options])
+        ax.set_xticks(range(1, len(options) + 1), options, rotation=30, fontsize=8)
+        ax.set_ylim(0, 1.02)
+        ax.grid(alpha=0.3, axis="y")
+        ax.set_title(parameter)
+    axes[0].set_ylabel(f"{metric} ({group} images)")
+    fig.suptitle("Effect of each choice on the score (each box = every recipe using that option)")
+    plt.tight_layout()
     return fig
 
 

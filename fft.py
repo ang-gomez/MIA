@@ -4,7 +4,7 @@ fft.py - Look at the Fourier spectrum and CHOOSE the frequency band
 
 Run this BEFORE main.py, and only when you want to (re)choose the band.
 It uses ONLY the DEVELOPMENT images (choosing on test would be cheating).
- 
+
 What it does:
     1. For each development image: shows the channel, its Fourier spectrum and
        how the energy is spread over the frequencies.
@@ -103,18 +103,33 @@ def figure_spectrum(channel, title):
     return fig
 
 
-def figure_filtered(channel, mask, title):
-    """The channel low-pass filtered at every tested high cut-off."""
-    fig, axes = plt.subplots(1, 1 + len(HIGH_CUTOFFS), figsize=(2.3 * (1 + len(HIGH_CUTOFFS)), 3))
-    axes[0].imshow(channel, cmap="gray")
-    axes[0].set_title("original", fontsize=9)
-    for ax, cutoff in zip(axes[1:], HIGH_CUTOFFS):
-        ax.imshow(utils.fft_bandpass(channel, 0, cutoff), cmap="gray")
-        ax.set_title(f"keep < {cutoff}", fontsize=9)
-    for ax in axes:
-        ax.contour(mask, levels=[0.5], colors=config.REFERENCE_COLOR, linewidths=0.6)
-        ax.axis("off")
-    fig.suptitle(title)
+def figure_filtered_all(dev_data):
+    """
+    ONE figure with all the development images, one under the other.
+    Each row (with the image name as title): the original channel, then the
+    channel low-pass filtered at every tested high cut-off.
+    Green = hand-drawn nucleus outline.
+    """
+    n_cols = 1 + len(HIGH_CUTOFFS)
+    fig = plt.figure(figsize=(1.9 * n_cols, 2.3 * len(dev_data)), layout="constrained")
+    # one "sub-figure" per image -> each row can have its own title
+    rows = fig.subfigures(len(dev_data), 1)
+
+    for row, d in zip(rows, dev_data):
+        channel = d["channels"][CHANNEL_TO_SHOW]
+        filtered = [channel] + [utils.fft_bandpass(channel, 0, c) for c in HIGH_CUTOFFS]
+        titles = ["original"] + [f"keep < {c}" for c in HIGH_CUTOFFS]
+
+        axes = row.subplots(1, n_cols)
+        for ax, image, title in zip(axes, filtered, titles):
+            ax.imshow(image, cmap="gray")
+            ax.contour(d["mask"], levels=[0.5], colors=config.REFERENCE_COLOR, linewidths=0.6)
+            ax.set_title(title, fontsize=8)
+            ax.axis("off")
+        row.suptitle(d["name"], fontsize=10, fontweight="bold")
+
+    fig.suptitle(f"Fourier low-pass filter on the {CHANNEL_TO_SHOW} channel "
+                 f"(green = hand-drawn nucleus)", fontsize=12)
     return fig
 
 
@@ -172,8 +187,7 @@ def main():
     for d in dev_data:
         channel = d["channels"][CHANNEL_TO_SHOW]
         utils.save_figure(figure_spectrum(channel, d["name"]), FOLDER, f"spectrum_{d['name']}")
-        utils.save_figure(figure_filtered(channel, d["mask"], d["name"]),
-                          FOLDER, f"filtered_{d['name']}")
+    utils.save_figure(figure_filtered_all(dev_data), FOLDER, "filtered_all_images")
     utils.print_banner("FOURIER - spectrum and filtered images saved")
 
     # 3. Score every band

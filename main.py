@@ -14,7 +14,7 @@ The whole pipeline runs from start to end, without questions:
              show its result on the test images
     STEP 7 - Sensitivity to noise (test images)
     STEP 8 - Sensitivity to ground-truth variability (test images)
- 
+
 The Fourier band is chosen BEFORE, with the separate script
 fft.py, and written in config.py (FFT_LOW_CUTOFF, FFT_HIGH_CUTOFF).
 
@@ -159,11 +159,20 @@ def run_step5(data):
 
     utils.save_table(results, config.RESULTS_FOLDER / "step5_all_results.csv")
 
-    # Figure: ranking of the recipes on the development images
+    # Figures (development images only)
+    folder = config.FIGURES_FOLDER / "step5_metrics"
     ranking = utils.mean_score_per_recipe(results, "development", config.RANKING_METRIC)
     if len(ranking) > 0:
-        fig = utils.figure_ranking(ranking, "Best recipes on DEVELOPMENT images")
-        utils.save_figure(fig, config.FIGURES_FOLDER / "step5_metrics", "development_ranking")
+        # a) all the recipes, from best to worst
+        fig = utils.figure_all_recipes(ranking, ranking[0][0],
+                                       "All recipes, sorted (development images)")
+        utils.save_figure(fig, folder, "1_all_recipes_sorted")
+        # b) the 20 best ones, zoomed
+        fig = utils.figure_ranking(ranking, "20 best recipes (development images)")
+        utils.save_figure(fig, folder, "2_top20_recipes")
+        # c) which choices matter
+        fig = utils.figure_parameter_effects(results, "development", config.RANKING_METRIC)
+        utils.save_figure(fig, folder, "3_effect_of_each_choice")
 
     utils.print_banner(f"STEP 5 COMPLETED - {len(results)} scores computed")
     return results
@@ -232,18 +241,20 @@ def run_step6(data, results):
 # ============================================================================
 # STEP 7 - Sensitivity to noise
 # ============================================================================
-def recipes_to_compare(results, best_recipe):
+def recipes_to_compare(best_recipe):
     """
-    The chosen recipe + the best recipe (on development) of every smoothing option,
-    to see if Gaussian or Fourier smoothing resists noise better.
+    The chosen recipe, and the SAME recipe with every other smoothing option
+    (only the smoothing changes: same channel, threshold and clean-up).
+    -> fair comparison: does blurring (Gaussian or Fourier) resist noise better?
     """
+    chosen = utils.recipe_from_name(best_recipe)
     names = [best_recipe]
-    ranking = utils.mean_score_per_recipe(results, "development", config.RANKING_METRIC)
     for smoothing in config.SMOOTHINGS:
-        tag = f"| {utils.smoothing_name(smoothing)} |"
-        best_of_this_smoothing = next(n for n, _ in ranking if tag in n)
-        if best_of_this_smoothing not in names:
-            names.append(best_of_this_smoothing)
+        variant = dict(chosen)            # copy of the chosen recipe...
+        variant["smoothing"] = smoothing  # ...with another smoothing
+        name = utils.recipe_name(variant)
+        if name not in names:
+            names.append(name)
     return names
 
 
@@ -259,7 +270,7 @@ def run_step7(data, results, best_recipe):
         return
 
     rng = np.random.default_rng(config.RANDOM_SEED)   # reproducible noise
-    names = recipes_to_compare(results, best_recipe)
+    names = recipes_to_compare(best_recipe)
     recipes = [utils.recipe_from_name(n) for n in names]
 
     # scores[recipe name][noise level] = list of Dice values
@@ -281,16 +292,20 @@ def run_step7(data, results, best_recipe):
     # Table + curve
     rows = []
     curves = {}
-    for name in names:
+    for name, recipe in zip(names, recipes):
         means = [float(np.mean(scores[name][level])) for level in config.NOISE_LEVELS]
-        label = name + ("  (CHOSEN)" if name == best_recipe else "")
+        if name == best_recipe:
+            label = f"CHOSEN recipe: {name}"
+        else:
+            label = f"same recipe with {utils.smoothing_name(recipe['smoothing'])}"
         curves[label] = means
         for level, mean in zip(config.NOISE_LEVELS, means):
             rows.append({"recipe": name, "noise_std": level, "mean_dice_test": mean})
     utils.save_table(rows, config.RESULTS_FOLDER / "step7_noise.csv")
 
-    fig = utils.figure_curves(config.NOISE_LEVELS, curves, "noise standard deviation",
-                              "mean Dice (test images)", "Sensitivity to noise")
+    fig = utils.figure_curves(config.NOISE_LEVELS, curves, "noise level (standard deviation)",
+                              "mean Dice: automatic vs manual (test images)",
+                              "Sensitivity to noise")
     utils.save_figure(fig, folder, "dice_vs_noise")
 
     fig = utils.figure_examples([e[0] for e in examples], [e[1] for e in examples],
@@ -337,10 +352,10 @@ def run_step8(data, best_recipe):
                      "mean_dice_original_vs_changed_mask": tracing_curve[-1]})
     utils.save_table(rows, config.RESULTS_FOLDER / "step8_ground_truth.csv")
 
-    curves = {"algorithm vs changed mask": algo_curve,
-              "original mask vs changed mask": tracing_curve}
+    curves = {"automatic segmentation vs modified manual mask": algo_curve,
+              "original manual mask vs modified manual mask": tracing_curve}
     fig = utils.figure_curves(config.GT_CHANGES_PX, curves,
-                              "mask change (pixels, - = smaller, + = bigger)",
+                              "manual mask change (pixels, - = smaller, + = bigger)",
                               "mean Dice (test images)",
                               "Sensitivity to ground-truth variability")
     utils.save_figure(fig, folder, "dice_vs_mask_change")
@@ -353,7 +368,8 @@ def run_step8(data, best_recipe):
                                 [utils.change_mask(d["mask"], p) for p in shown],
                                 [d["segmentations"][best_recipe]] * len(shown),
                                 [f"mask change = {p:+d} px" for p in shown],
-                                f"{d['name']} - green = changed mask, red = algorithm")
+                                f"{d['name']} - green = modified manual mask, "
+                                f"red = automatic segmentation")
     utils.save_figure(fig, folder, "examples")
 
     utils.print_banner(f"STEP 8 COMPLETED - {len(config.GT_CHANGES_PX)} mask changes tested")
