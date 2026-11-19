@@ -1,0 +1,14 @@
+# Imágenes
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.bmp
+*.gif
+
+# Basura de Python / sistema
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
