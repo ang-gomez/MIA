@@ -14,7 +14,7 @@ The whole pipeline runs from start to end, without questions:
              show its result on the test images
     STEP 7 - Sensitivity to noise (test images)
     STEP 8 - Sensitivity to ground-truth variability (test images)
-
+ 
 The Fourier band is chosen BEFORE, with the separate script
 fft.py, and written in config.py (FFT_LOW_CUTOFF, FFT_HIGH_CUTOFF).
 

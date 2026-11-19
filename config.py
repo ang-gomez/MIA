@@ -6,7 +6,7 @@ This file contains no code that "does" something: only settings.
 If you want to change a folder, a parameter or the list of methods to test,
 you change it HERE, and main.py / utils.py stay the same.
 """
-
+ 
 from pathlib import Path
 
 # ============================================================================

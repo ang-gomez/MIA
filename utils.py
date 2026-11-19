@@ -45,7 +45,7 @@ def list_image_files(folder):
     config.IMAGE_EXTENSIONS), sorted by name.
     Subfolders are searched only if config.SEARCH_SUBFOLDERS is True.
     The "figures" and "results" folders made by this program are ignored.
-    """
+    """ 
     # glob("*")  = only this folder ; rglob("*") = this folder + all subfolders
     if config.SEARCH_SUBFOLDERS:
         candidates = folder.rglob("*")

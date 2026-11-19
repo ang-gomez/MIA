@@ -4,7 +4,7 @@ fft.py - Look at the Fourier spectrum and CHOOSE the frequency band
 
 Run this BEFORE main.py, and only when you want to (re)choose the band.
 It uses ONLY the DEVELOPMENT images (choosing on test would be cheating).
-
+ 
 What it does:
     1. For each development image: shows the channel, its Fourier spectrum and
        how the energy is spread over the frequencies.
